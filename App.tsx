@@ -456,17 +456,23 @@ function ChatScreen({
     setError(null);
     setNotice(null);
     if (!faceAsked.current) {
-      const ok = await new Promise<boolean>((resolve) =>
-        Alert.alert(
-          '📷 Expression check',
-          'Aapki selfie Google Gemini ko bheji jayegi taaki wo aapka expression dekh sake. Photo app mein save nahi hoti. Aage badhein?',
-          [
-            { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
-            { text: 'Haan', onPress: () => resolve(true) },
-          ],
-          { onDismiss: () => resolve(false) },
-        ),
-      );
+      const msg =
+        'Aapki selfie Google Gemini ko bheji jayegi taaki wo aapka expression dekh sake. Photo save nahi hoti. Aage badhein?';
+      // Alert.alert does nothing on the web, so use the browser's confirm dialog there.
+      const ok =
+        Platform.OS === 'web'
+          ? window.confirm(msg)
+          : await new Promise<boolean>((resolve) =>
+              Alert.alert(
+                '📷 Expression check',
+                msg,
+                [
+                  { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+                  { text: 'Haan', onPress: () => resolve(true) },
+                ],
+                { onDismiss: () => resolve(false) },
+              ),
+            );
       if (!ok) return;
       faceAsked.current = true;
     }
@@ -492,7 +498,13 @@ function ChatScreen({
   };
 
   const toggleMic = async () => {
-    if (!voiceInputAvailable) return toggleRecording();
+    if (!voiceInputAvailable) {
+      if (Platform.OS === 'web') {
+        setNotice('Is browser mein voice support nahi hai. Chrome ya Edge use karo, ya type karke likho.');
+        return;
+      }
+      return toggleRecording();
+    }
     if (listening) {
       stopRef.current?.();
       return;

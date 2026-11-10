@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import * as Speech from 'expo-speech';
 
 // expo-speech-recognition is a custom native module, so it is NOT available in Expo Go.
@@ -10,7 +11,14 @@ try {
   Mod = null;
 }
 
-export const voiceInputAvailable = !!Mod;
+// On the web the module wraps the browser's own speech recognition (Chrome/Edge/Safari), which Firefox lacks.
+let webSupported = true;
+try {
+  if (Platform.OS === 'web') webSupported = !!Mod?.isRecognitionAvailable?.();
+} catch {
+  webSupported = false;
+}
+export const voiceInputAvailable = !!Mod && webSupported;
 
 export type SpeakOptions = {
   rate?: number;
