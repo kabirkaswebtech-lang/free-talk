@@ -1,13 +1,14 @@
 {
   "expo": {
-    "name": "english-bot",
-    "slug": "english-bot",
+    "name": "English Buddy",
+    "slug": "english-buddy",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.englishbuddy.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -16,10 +17,28 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.englishbuddy.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow English Buddy to use the microphone so you can practice speaking.",
+          "speechRecognitionPermission": "Allow English Buddy to recognise your speech."
+        }
+      ],
+      "expo-audio",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow English Buddy to use the camera for the expression check."
+        }
+      ],
+      "expo-asset"
+    ]
   }
 }
