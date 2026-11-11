@@ -29,7 +29,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { analyzeFace, askGemini, Level, Scenario, SCENARIOS, transcribeAudio, Turn } from './src/gemini';
 import { speak, startListening, stopSpeaking, voiceInputAvailable } from './src/speech';
 import Avatar from './src/Avatar';
-import Scene, { SceneMode } from './src/Scene';
+import SceneView from './src/SceneView';
+import type { SceneMode } from './src/behavior';
 import { Character, CHARACTERS, getCharacter } from './src/characters';
 
 type Msg = {
@@ -560,101 +561,116 @@ function ChatScreen({
     }
   };
 
+  const statusText =
+    sceneMode === 'listening'
+      ? '· 👂 Sun raha hu...'
+      : sceneMode === 'thinking'
+        ? '· 💭 Soch raha hu...'
+        : sceneMode === 'speaking'
+          ? '· 🗣️ Bol raha hu...'
+          : sceneMode === 'typing'
+            ? '· 👀 Aapki typing dekh raha hu...'
+            : '· Aapki baari!';
+
   return (
-    <KeyboardAvoidingView style={s.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={s.header}>
-        <Pressable onPress={onBack} hitSlop={10}>
-          <Text style={{ fontSize: 16, color: C.primary }}>← Back</Text>
-        </Pressable>
-        <Text style={s.cardTitle}>
-          {scenario.emoji} {scenario.title}
-        </Text>
-        <Pressable
-          onPress={() => {
-            stopSpeaking();
-            setAutoSpeak((v) => !v);
-          }}
-          hitSlop={10}
-        >
-          <Text style={{ fontSize: 22 }}>{autoSpeak ? '🔊' : '🔇'}</Text>
-        </Pressable>
+    <View style={s.fill}>
+      {/* The 3D room fills the whole screen. The chat floats on top of it. */}
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        <SceneView kind={character.id} mode={sceneMode} />
       </View>
 
-      <View style={s.avatarBox}>
-        <Scene kind={character.id} mode={sceneMode} compact={kbOpen} />
-        <Text style={s.avatarName}>
-          {character.name}{' '}
-          <Text style={{ color: C.muted, fontWeight: '400' }}>
-            {sceneMode === 'listening'
-              ? '· 👂 Sun raha hu...'
-              : sceneMode === 'thinking'
-                ? '· 💭 Soch raha hu...'
-                : sceneMode === 'speaking'
-                  ? '· 🗣️ Bol raha hu...'
-                  : sceneMode === 'typing'
-                    ? '· 👀 Aapki typing dekh raha hu...'
-                    : '· Aapki baari!'}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={[s.header, s.glass]}>
+          <Pressable onPress={onBack} hitSlop={10}>
+            <Text style={{ fontSize: 16, color: C.primary }}>← Back</Text>
+          </Pressable>
+          <Text style={s.cardTitle}>
+            {scenario.emoji} {scenario.title}
           </Text>
-        </Text>
-      </View>
+          <Pressable
+            onPress={() => {
+              stopSpeaking();
+              setAutoSpeak((v) => !v);
+            }}
+            hitSlop={10}
+          >
+            <Text style={{ fontSize: 22 }}>{autoSpeak ? '🔊' : '🔇'}</Text>
+          </Pressable>
+        </View>
 
-      <FlatList
-        ref={listRef}
-        data={msgs}
-        keyExtractor={(m) => m.id}
-        contentContainerStyle={{ padding: 16, gap: 10 }}
-        renderItem={({ item }) => <Bubble m={item} onSpeak={say} />}
-        ListFooterComponent={
-          <View>
-            {busy && <ActivityIndicator color={C.primary} style={{ marginTop: 8, alignSelf: 'flex-start' }} />}
-            {notice && <Text style={{ color: C.muted, marginTop: 8 }}>ℹ️ {notice}</Text>}
-            {error && (
-              <View style={{ marginTop: 8 }}>
-                <Text style={{ color: '#DC2626' }}>{error}</Text>
-                {retryFn && (
-                  <Pressable
-                    onPress={retryFn}
-                    disabled={busy}
-                    style={[s.btn, { marginTop: 10, alignSelf: 'flex-start', paddingVertical: 10 }]}
-                  >
-                    <Text style={s.btnText}>🔄 Retry</Text>
-                  </Pressable>
+        <View style={s.statusPill}>
+          <Text style={s.statusText}>
+            {character.emoji} {character.name} {statusText}
+          </Text>
+        </View>
+
+        {/* the empty top half is where the character stands */}
+        <View style={{ flex: kbOpen ? 1 : 1.3 }} pointerEvents="none" />
+
+        <View style={{ flex: kbOpen ? 1.2 : 1 }}>
+          <FlatList
+            ref={listRef}
+            data={msgs}
+            keyExtractor={(m) => m.id}
+            contentContainerStyle={{ padding: 14, gap: 10 }}
+            renderItem={({ item }) => <Bubble m={item} onSpeak={say} />}
+            ListFooterComponent={
+              <View>
+                {busy && (
+                  <View style={s.thinkingDot}>
+                    <ActivityIndicator color={C.primary} />
+                  </View>
+                )}
+                {notice && <Text style={[s.floatNote, { color: C.muted }]}>ℹ️ {notice}</Text>}
+                {error && (
+                  <View style={s.floatNote}>
+                    <Text style={{ color: '#DC2626' }}>{error}</Text>
+                    {retryFn && (
+                      <Pressable
+                        onPress={retryFn}
+                        disabled={busy}
+                        style={[s.btn, { marginTop: 10, alignSelf: 'flex-start', paddingVertical: 10 }]}
+                      >
+                        <Text style={s.btnText}>🔄 Retry</Text>
+                      </Pressable>
+                    )}
+                  </View>
                 )}
               </View>
-            )}
-          </View>
-        }
-      />
+            }
+          />
+        </View>
 
-      <View style={s.inputBar}>
-        <Pressable onPress={checkFace} disabled={busy || recording} style={s.mic} accessibilityLabel="Expression check">
-          <Text style={{ fontSize: 20 }}>📷</Text>
-        </Pressable>
-        <Pressable
-          onPress={toggleMic}
-          disabled={busy && !recording && !listening}
-          style={[s.mic, (listening || recording) && { backgroundColor: '#DC2626' }]}
-          accessibilityLabel="Microphone"
-        >
-          <Text style={{ fontSize: 20 }}>{listening || recording ? '⏹️' : '🎤'}</Text>
-        </Pressable>
-        <TextInput
-          style={[s.input, { flex: 1, marginBottom: 0 }]}
-          value={input}
-          onChangeText={onType}
-          placeholder={listening || recording ? 'Listening...' : 'Type or tap 🎤 to speak'}
-          multiline
-          onSubmitEditing={() => send(input)}
-        />
-        <Pressable
-          onPress={() => send(input)}
-          disabled={busy || !input.trim()}
-          style={[s.send, (busy || !input.trim()) && { opacity: 0.4 }]}
-        >
-          <Text style={{ color: '#fff', fontWeight: '700' }}>Send</Text>
-        </Pressable>
-      </View>
-    </KeyboardAvoidingView>
+        <View style={[s.inputBar, s.glass]}>
+          <Pressable onPress={checkFace} disabled={busy || recording} style={s.mic} accessibilityLabel="Expression check">
+            <Text style={{ fontSize: 20 }}>📷</Text>
+          </Pressable>
+          <Pressable
+            onPress={toggleMic}
+            disabled={busy && !recording && !listening}
+            style={[s.mic, (listening || recording) && { backgroundColor: '#DC2626' }]}
+            accessibilityLabel="Microphone"
+          >
+            <Text style={{ fontSize: 20 }}>{listening || recording ? '⏹️' : '🎤'}</Text>
+          </Pressable>
+          <TextInput
+            style={[s.input, { flex: 1, marginBottom: 0 }]}
+            value={input}
+            onChangeText={onType}
+            placeholder={listening || recording ? 'Listening...' : 'Type or tap 🎤 to speak'}
+            multiline
+            onSubmitEditing={() => send(input)}
+          />
+          <Pressable
+            onPress={() => send(input)}
+            disabled={busy || !input.trim()}
+            style={[s.send, (busy || !input.trim()) && { opacity: 0.4 }]}
+          >
+            <Text style={{ color: '#fff', fontWeight: '700' }}>Send</Text>
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -747,7 +763,7 @@ const s = StyleSheet.create({
   btnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
   bubble: { maxWidth: '85%', padding: 12, borderRadius: 16 },
   mine: { backgroundColor: C.primary, borderBottomRightRadius: 4 },
-  theirs: { backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderBottomLeftRadius: 4 },
+  theirs: { backgroundColor: 'rgba(255,255,255,0.94)', borderWidth: 1, borderColor: C.border, borderBottomLeftRadius: 4 },
   feedback: {
     maxWidth: '85%',
     marginTop: 6,
@@ -785,6 +801,29 @@ const s = StyleSheet.create({
   },
   charCardOn: { borderColor: C.primary, backgroundColor: '#EEF2FF' },
   charName: { marginTop: 2, fontWeight: '700', color: C.text, fontSize: 13 },
+  glass: { backgroundColor: 'rgba(255,255,255,0.88)' },
+  statusPill: {
+    alignSelf: 'center',
+    marginTop: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  statusText: { color: '#fff', fontWeight: '600', fontSize: 13 },
+  thinkingDot: {
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.93)',
+  },
+  floatNote: {
+    marginTop: 8,
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.93)',
+  },
   avatarBox: {
     alignItems: 'center',
     paddingBottom: 4,
