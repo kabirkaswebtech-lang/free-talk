@@ -29,6 +29,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { analyzeFace, askGemini, Level, Scenario, SCENARIOS, transcribeAudio, Turn } from './src/gemini';
 import { speak, startListening, stopSpeaking, voiceInputAvailable } from './src/speech';
 import Avatar from './src/Avatar';
+import Scene, { SceneMode } from './src/Scene';
 import { Character, CHARACTERS, getCharacter } from './src/characters';
 
 type Msg = {
@@ -322,6 +323,8 @@ function ChatScreen({
   const [retryFn, setRetryFn] = useState<null | (() => void)>(null);
   const [speaking, setSpeaking] = useState(false);
   const [kbOpen, setKbOpen] = useState(false);
+  const [typingActive, setTypingActive] = useState(false);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recorder = useAudioRecorder(REC_OPTIONS);
   const faceAsked = useRef(false);
   const stopRef = useRef<null | (() => void)>(null);
@@ -396,6 +399,28 @@ function ChatScreen({
   useEffect(() => {
     setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
   }, [msgs, busy]);
+
+  // The character reacts to what the user is doing right now.
+  const onType = (text: string) => {
+    setInput(text);
+    setTypingActive(true);
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+    typingTimer.current = setTimeout(() => setTypingActive(false), 2000);
+  };
+  useEffect(() => () => {
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+  }, []);
+
+  const sceneMode: SceneMode =
+    recording || listening
+      ? 'listening'
+      : speaking
+        ? 'speaking'
+        : busy
+          ? 'thinking'
+          : typingActive && input.trim()
+            ? 'typing'
+            : 'idle';
 
   const send = (text: string) => {
     const t = text.trim();
@@ -556,22 +581,19 @@ function ChatScreen({
       </View>
 
       <View style={s.avatarBox}>
-        <Avatar
-          kind={character.id}
-          speaking={speaking}
-          thinking={busy && !speaking}
-          size={kbOpen ? 56 : 130}
-        />
+        <Scene kind={character.id} mode={sceneMode} compact={kbOpen} />
         <Text style={s.avatarName}>
           {character.name}{' '}
           <Text style={{ color: C.muted, fontWeight: '400' }}>
-            {recording || listening
+            {sceneMode === 'listening'
               ? '· 👂 Sun raha hu...'
-              : busy
+              : sceneMode === 'thinking'
                 ? '· 💭 Soch raha hu...'
-                : speaking
+                : sceneMode === 'speaking'
                   ? '· 🗣️ Bol raha hu...'
-                  : '· Aapki baari!'}
+                  : sceneMode === 'typing'
+                    ? '· 👀 Aapki typing dekh raha hu...'
+                    : '· Aapki baari!'}
           </Text>
         </Text>
       </View>
@@ -619,7 +641,7 @@ function ChatScreen({
         <TextInput
           style={[s.input, { flex: 1, marginBottom: 0 }]}
           value={input}
-          onChangeText={setInput}
+          onChangeText={onType}
           placeholder={listening || recording ? 'Listening...' : 'Type or tap 🎤 to speak'}
           multiline
           onSubmitEditing={() => send(input)}
@@ -765,7 +787,7 @@ const s = StyleSheet.create({
   charName: { marginTop: 2, fontWeight: '700', color: C.text, fontSize: 13 },
   avatarBox: {
     alignItems: 'center',
-    paddingVertical: 6,
+    paddingBottom: 4,
     backgroundColor: '#EEF2FF',
     borderBottomWidth: 1,
     borderBottomColor: C.border,
